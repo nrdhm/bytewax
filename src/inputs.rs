@@ -111,7 +111,7 @@ pub(crate) struct Source(Py<PyAny>);
 impl<'py> FromPyObject<'py> for Source {
     fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
         let py = ob.py();
-        let abc = py.import_bound("bytewax.inputs")?.getattr("Source")?;
+        let abc = py.import("bytewax.inputs")?.getattr("Source")?;
         if !ob.is_instance(&abc)? {
             Err(PyTypeError::new_err(
                 "source must subclass `bytewax.inputs.Source`",
@@ -152,7 +152,7 @@ impl<'py> FromPyObject<'py> for FixedPartitionedSource {
     fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
         let py = ob.py();
         let abc = py
-            .import_bound("bytewax.inputs")?
+            .import("bytewax.inputs")?
             .getattr("FixedPartitionedSource")?;
         if !ob.is_instance(&abc)? {
             Err(PyTypeError::new_err(
@@ -598,7 +598,7 @@ impl<'py> FromPyObject<'py> for StatefulPartition {
     fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
         let py = ob.py();
         let abc = py
-            .import_bound("bytewax.inputs")?
+            .import("bytewax.inputs")?
             .getattr("StatefulSourcePartition")?;
         if !ob.is_instance(&abc)? {
             Err(tracked_err::<PyTypeError>(
@@ -670,9 +670,7 @@ pub(crate) struct DynamicSource(Py<PyAny>);
 impl<'py> FromPyObject<'py> for DynamicSource {
     fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
         let py = ob.py();
-        let abc = py
-            .import_bound("bytewax.inputs")?
-            .getattr("DynamicSource")?;
+        let abc = py.import("bytewax.inputs")?.getattr("DynamicSource")?;
         if !ob.is_instance(&abc)? {
             Err(tracked_err::<PyTypeError>(
                 "dynamic source must subclass `bytewax.inputs.DynamicSource`",
@@ -883,7 +881,7 @@ impl<'py> FromPyObject<'py> for StatelessPartition {
     fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
         let py = ob.py();
         let abc = py
-            .import_bound("bytewax.inputs")?
+            .import("bytewax.inputs")?
             .getattr("StatelessSourcePartition")?;
         if !ob.is_instance(&abc)? {
             Err(tracked_err::<PyTypeError>(
@@ -938,6 +936,6 @@ impl Drop for StatelessPartition {
 }
 
 pub(crate) fn register(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add("AbortExecution", py.get_type_bound::<AbortExecution>())?;
+    m.add("AbortExecution", py.get_type::<AbortExecution>())?;
     Ok(())
 }
