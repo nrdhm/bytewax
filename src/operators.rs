@@ -239,7 +239,7 @@ where
 impl<S> InspectDebugOp<S> for Stream<S, TdPyAny>
 where
     S: Scope,
-    S::Timestamp: IntoPy<PyObject> + TotalOrder,
+    for<'py> S::Timestamp: IntoPyObject<'py> + TotalOrder,
 {
     fn inspect_debug(
         &self,
@@ -406,6 +406,7 @@ where
                 });
             }
         });
+
         downstream
     }
 }
@@ -423,13 +424,13 @@ where
 {
     fn wrap_key(&self) -> Stream<S, TdPyAny> {
         self.map(move |(key, value)| {
-            Python::with_gil(|py| {
+            unwrap_any!(Python::with_gil(|py| -> PyResult<TdPyAny> {
                 let value = value.into_py(py);
 
-                let item = IntoPy::<PyObject>::into_py((key, value), py);
+                let item = IntoPyObject::into_pyobject((key, value), py)?;
 
-                TdPyAny::from(item)
-            })
+                Ok(TdPyAny::from(item))
+            }))
         })
     }
 }
