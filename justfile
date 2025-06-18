@@ -84,7 +84,7 @@ pytests := 'pytests/'
 
 # Run the Python tests; runs in CI
 test-py tests=pytests: _assert-venv
-    pytest --benchmark-skip {{tests}}
+    pytest -x --benchmark-skip {{tests}}
 
 # Run the Python benchmarks; runs in CI
 test-benchmark:

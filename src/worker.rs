@@ -150,6 +150,7 @@ where
     })?;
 
     tracing::info_span!("production_dataflow").in_scope(|| {
+        tracing::info!("production_dataflow start");
         worker.run(probe);
     });
 
@@ -342,6 +343,7 @@ where
                         if let Ok(source) = source.extract::<FixedPartitionedSource>(py) {
                             let (down, snap) = source
                                 .partitioned_input(
+                                // .partitioned_input_orig(
                                     py,
                                     scope,
                                     step_id,
@@ -484,6 +486,7 @@ where
 
         // Attach the probe to the relevant final output.
         if let Some((bundle, backup_interval)) = recovery {
+            // assert!(false, "should not use recovery");
             scope
                 .concatenate(snaps)
                 .write_recovery(resume_from, bundle, epoch_interval, backup_interval)
