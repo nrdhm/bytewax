@@ -530,14 +530,9 @@ where
         ];
 
         let downstream = self.unary_frontier(Pipeline, &step_id.0, |_init_cap, _info| {
-            // let mut tmp_incoming: Vec<TdPyAny> = Vec::new();
-
             move |input, output| {
                 part = part.take().and_then(|sink| {
                     input.for_each(|cap, incoming| {
-                        // assert!(tmp_incoming.is_empty());
-                        // incoming.swap(&mut tmp_incoming);
-
                         let mut output_session = output.session(&cap);
 
                         let batch: Vec<PyObject> = incoming
