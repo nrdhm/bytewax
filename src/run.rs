@@ -268,7 +268,6 @@ pub(crate) fn cluster_main(
                 addresses,
                 report: false,
                 zerocopy: false,
-                // TODO try adding tracing here
                 log_fn: Arc::new(|_| None),
             }
         }
