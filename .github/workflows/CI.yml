@@ -107,7 +107,7 @@ jobs:
         if: ${{ matrix.target == 'x86_64' }}
         shell: bash
         env:
-          TEST_KAFKA_BROKER: ${{ secrets.TEST_KAFKA_BROKER }}
+          # TEST_KAFKA_BROKER: ${{ secrets.TEST_KAFKA_BROKER }}
           CLUSTER_API_KEY: ${{ secrets.CLUSTER_API_KEY }}
           CLUSTER_API_SECRET: ${{ secrets.CLUSTER_API_SECRET }}
         run: |
