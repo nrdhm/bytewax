@@ -88,6 +88,7 @@ ignore = [
     "D105",
     "E731",
     "PLR",
+    "B905",  # we know how zip() works
 ]
 
 [tool.ruff.lint.pydocstyle]
