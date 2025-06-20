@@ -18,4 +18,4 @@ def test_merge():
 
     run_main(flow)
     # order seems to be undefined
-    assert set(out) == set([1, 2, 100, 3, 4, 200, 5, 6, 300])
+    assert sorted(out) == sorted([1, 2, 100, 3, 4, 200, 5, 6, 300])
