@@ -305,9 +305,6 @@ impl FixedPartitionedSource {
 
                     loads_input.for_each(|cap, incoming| {
                         let load_epoch = cap.time();
-                        // assert!(tmp.is_empty());
-                        // incoming.swap(&mut tmp);
-
                         // Snapshots might be from an "old" epoch if
                         // there were no items and thus snapshots
                         // stored during a more recent epoch, so
