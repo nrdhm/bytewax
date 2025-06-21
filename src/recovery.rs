@@ -1509,8 +1509,6 @@ where
 
             move |snaps_input, ser_snaps_output| {
                 snaps_input.for_each(|cap, incoming| {
-                    // incoming.swap(&mut inbuf);
-
                     let epoch = cap.time();
                     Python::with_gil(|py| {
                         let ser_snaps =

@@ -427,15 +427,13 @@ where
         let (mut downstream_output, downstream) = op_builder.new_output();
 
         op_builder.build(move |_| {
-            let mut inbuf = Vec::new();
             move |_frontiers| {
                 let mut downstream_handle = downstream_output.activate();
 
                 self_handle.for_each(|time, data| {
-                    data.swap(&mut inbuf);
                     let mut downstream_session = downstream_handle.session(&time);
                     unwrap_any!(Python::with_gil(|py| -> PyResult<()> {
-                        for (key, value) in inbuf.drain(..) {
+                        for (key, value) in data.drain(..) {
                             let value = value.into_py(py);
 
                             let item = IntoPyObject::into_pyobject((key, value), py)?;
