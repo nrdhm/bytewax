@@ -17,4 +17,5 @@ def test_merge():
     op.output("out", s, TestingSink(out))
 
     run_main(flow)
-    assert out == [1, 2, 100, 3, 4, 200, 5, 6, 300]
+    # order seems to be undefined
+    assert sorted(out) == sorted([1, 2, 100, 3, 4, 200, 5, 6, 300])

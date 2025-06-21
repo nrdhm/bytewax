@@ -1,8 +1,8 @@
 (xref-installing)=
 # Installing
 
-Bytewax currently supports the following versions of Python: 3.8, 3.9,
-3.10 and 3.11.
+Bytewax currently supports the following versions of Python: 3.10,
+3.11 and 3.12.
 
 ## Installing with pip
 

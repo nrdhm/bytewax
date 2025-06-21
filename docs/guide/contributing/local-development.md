@@ -37,7 +37,7 @@ You can also use your OS's package manager to get access to different
 Python versions.
 
 Our blessed version of Python for doing development is Python 3.12
-(although the Bytewax library is designed to run on versions 3.8+).
+(although the Bytewax library is designed to run on versions 3.10+).
 
 Ensure that you have Python 3.12 installed and available as a "global
 shim" so that it can be run anywhere. The following will make plain
@@ -148,7 +148,7 @@ To run the Python or Rust tests use the following recipes.
 
 This will run a series of lints on the code:
 
-- Ensure all Python code is compatible with at least Python 3.8.
+- Ensure all Python code is compatible with at least Python 3.10.
 
 - Use [`ruff`](https://docs.astral.sh/ruff/) to lint the Python code.
 
