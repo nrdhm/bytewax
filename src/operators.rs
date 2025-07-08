@@ -436,7 +436,7 @@ where
                         for (key, value) in data.drain(..) {
                             let value = value.into_py(py);
 
-                            let item = IntoPyObject::into_pyobject((key, value), py)?;
+                            let item = (key, value).into_pyobject(py)?;
 
                             downstream_session.give(TdPyAny::from(item));
                         }
