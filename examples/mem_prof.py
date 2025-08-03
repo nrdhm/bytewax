@@ -1,31 +1,23 @@
+"""
+Generate two fifos like in gen_mem_prof_data.sh
+Read them in parallel with two workers.
+Check if memory leaks.
+
+"""
+
 import copy
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import (
-    Callable,
-    Iterable,
-    Iterator,
-    List,
-    Optional,
-    override,
-    Tuple,
-    TypeVar,
-)
+from typing import Callable, Iterable, Iterator, List, Optional, Tuple, TypeVar
 
 from bytewax import operators as op
-from bytewax.connectors.files import CSVSource, FileSource
 from bytewax.connectors.stdio import StdOutSink
 from bytewax.dataflow import Dataflow, f_repr
-from bytewax.inputs import (
-    batch,
-    DynamicSource,
-    FixedPartitionedSource,
-    StatefulSourcePartition,
-    StatelessSourcePartition,
-)
+from bytewax.inputs import FixedPartitionedSource, StatefulSourcePartition
 from bytewax.operators import KeyedStream, StatefulLogic
+from typing_extensions import override
 
 
 def _readlines(f) -> Iterator[str | None]:
