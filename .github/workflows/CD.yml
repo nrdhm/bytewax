@@ -13,7 +13,7 @@ on:
       # - 'release-*' # Use this to trigger for tags starting with 'release-'
 
 jobs:
-  build-and-release::
+  build-and-release:
     name: Release
     runs-on: ubuntu-latest
     if: "startsWith(github.ref, 'refs/tags/')"
