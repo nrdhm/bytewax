@@ -24,7 +24,7 @@ jobs:
     # runs-on: ubuntu-latest
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/cache@v4
         with:
           path: |
@@ -35,7 +35,7 @@ jobs:
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
       - name: Set up uv
@@ -53,6 +53,7 @@ jobs:
           RUSTFLAGS: -C force-frame-pointers=yes
         with:
           target: ${{ matrix.target }}
+          manylinux: auto
           args: --release --out dist/ -i ${{ matrix.python-version }}
           sccache: true
       - name: Run Python tests
