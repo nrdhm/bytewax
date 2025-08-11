@@ -41,7 +41,7 @@ jobs:
           echo "::notice title=Base Tag::${{ steps.get-info.outputs.version-image-tag }}"
           [ -n "${{steps.get-info.outputs.latest-image-tag}}" ]
           echo "::notice title=Latest Tag::${{ steps.get-info.outputs.latest-image-tag }}"
-          echo "::notice github.event.workflow_run.id: ${{ github.event.workflow_run.id }}"
+          echo "::notice title=Run ID::${{ github.event.workflow_run.id }}"
 
       - name: Download Wheels
         uses: actions/download-artifact@v4
