@@ -1,16 +1,17 @@
 name: CD
 
-# on:
-#   release:
-#     types:
-#     - published
-
 on:
   push:
     tags:
       - 'v*' # This will trigger the workflow for any tag starting with 'v', e.g., v1.0, v2.0.1
       # - '*' # Use this to trigger for any tag
       # - 'release-*' # Use this to trigger for tags starting with 'release-'
+  workflow_dispatch:
+
+# on:
+#   release:
+#     types:
+#     - published
 
 jobs:
   linux-build:
