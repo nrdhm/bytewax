@@ -8,10 +8,9 @@ on:
       # - 'release-*' # Use this to trigger for tags starting with 'release-'
   workflow_dispatch:
 
-# on:
-#   release:
-#     types:
-#     - published
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   linux-build:

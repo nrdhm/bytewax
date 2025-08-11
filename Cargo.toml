@@ -1,6 +1,6 @@
 [package]
 name = "bytewax"
-version = "0.22.0-rc.2"
+version = "0.22.0-rc.3"
 edition = "2021"
 
 [lib]
