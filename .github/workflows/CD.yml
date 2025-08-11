@@ -80,48 +80,30 @@ jobs:
     needs: [ linux-build ]
     outputs:
       bytewax-version: ${{ steps.get-info.outputs.bytewax-version }}
-      version-image-tag: ${{ steps.get-info.outputs.version-image-tag }}
-      latest-image-tag: ${{ steps.get-info.outputs.latest-image-tag }}
+    environment:
+      name: pypi
+      url: https://pypi.org/p/bytewax-fork
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing
 
     steps:
-      - name: Get Version and Tags
-        id: get-info
-        run: |
-          BYTEWAX_VERSION=${GITHUB_REF:11}
-          echo "::set-output name=bytewax-version::${BYTEWAX_VERSION}"
-          REPOSITORY=bytewax/bytewax
-          IMAGE_TAG="${REPOSITORY}:${GITHUB_REF:11}"
-          echo "::set-output name=version-image-tag::${IMAGE_TAG}"
-          echo "::set-output name=latest-image-tag::${REPOSITORY}:latest"
-
-      - name: Report Info
-        run: |
-          [ -n "${{steps.get-info.outputs.bytewax-version}}" ]
-          echo "::notice title=Bytewax Version::${{ steps.get-info.outputs.bytewax-version }}"
-          [ -n "${{steps.get-info.outputs.version-image-tag}}" ]
-          echo "::notice title=Base Tag::${{ steps.get-info.outputs.version-image-tag }}"
-          [ -n "${{steps.get-info.outputs.latest-image-tag}}" ]
-          echo "::notice title=Latest Tag::${{ steps.get-info.outputs.latest-image-tag }}"
-
       - name: Download Wheels
         uses: actions/download-artifact@v4
         with:
           pattern: wheels-*-*
-          path: wheels
+          path: dist/
           merge-multiple: true
 
       - uses: actions/setup-python@v2
         with:
           python-version: 3.12
 
-      - name: Publish to PyPI
-        # env:
-        #   TWINE_USERNAME: __token__
-        #   TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+      - name: Show workdir
         run: |
           tree
-        #  pip install --upgrade twine
-        #  twine upload --skip-existing *.whl
+
+      - name: Publish distribution 📦 to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
 
 
 # jobs:

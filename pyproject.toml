@@ -1,5 +1,5 @@
 [project]
-name = "bytewax"
+name = "bytewax-fork"
 requires-python = ">=3.10"
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -34,10 +34,10 @@ kafka = [
 ]
 
 [project.urls]
-"Source Code" = "https://github.com/bytewax/bytewax"
-Issues = "https://github.com/bytewax/bytewax/issues"
+"Source Code" = "https://github.com/nrdhm/bytewax"
+Issues = "https://github.com/nrdhm/bytewax/issues"
 Documentation = "https://docs.bytewax.io/"
-Changelog = "https://github.com/bytewax/bytewax/blob/main/CHANGELOG.md"
+Changelog = "https://github.com/nrdhm/bytewax/blob/main/CHANGELOG.md"
 
 [metadata]
 long_description = "file: README.md"
