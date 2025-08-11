@@ -1,13 +1,13 @@
 name: CI
 
 on:
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - ".github/ISSUE_TEMPLATE/**"
-  pull_request: {}
-  merge_group:
+  # push:
+  #   branches:
+  #     - main
+  #   paths-ignore:
+  #     - ".github/ISSUE_TEMPLATE/**"
+  # pull_request: {}
+  # merge_group:
   workflow_dispatch:
 
 
