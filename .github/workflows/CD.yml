@@ -59,7 +59,7 @@ jobs:
         # armv7 are cross-compiled on Ubuntu runners.
         if: ${{ matrix.target == 'x86_64' }}
         shell: bash
-        env:
+        # env:
           # TEST_KAFKA_BROKER: ${{ secrets.TEST_KAFKA_BROKER }}
           # CLUSTER_API_KEY: ${{ secrets.CLUSTER_API_KEY }}
           # CLUSTER_API_SECRET: ${{ secrets.CLUSTER_API_SECRET }}
