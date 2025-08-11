@@ -520,8 +520,8 @@ impl FixedPartitionedSource {
                                 // TODO could use a notificator here?
                                 // Need to wait for the next epoch of the probe somehow.
                                 // Without this extra time, we would spin up again and waste cycles.
-                                let delta = TimeDelta::try_milliseconds(100).unwrap();
-                                part_state.next_awake = default_next_awake(Some(now + delta), 0, now);
+                                // let delta = TimeDelta::try_milliseconds(100).unwrap();
+                                // part_state.next_awake = default_next_awake(Some(now + delta), 0, now);
                                 // A dirty hack?
                                 // Trying to resolve an issue when one partition
                                 // increasingly lags behind of another in multiworker setup.

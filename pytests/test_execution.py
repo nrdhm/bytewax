@@ -22,7 +22,7 @@ def test_run(entry_point):
 
     entry_point(flow)
 
-    assert sorted(out) == sorted([1, 2, 3])
+    assert out == [1, 2, 3]
 
 
 def test_reraises_custom_exception(entry_point):
