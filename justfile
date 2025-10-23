@@ -113,8 +113,6 @@ venv-init-doc:
 # Init the CI Python build venvs; only use if you are debugging CI build dependencies
 venv-init-build:
     mkdir -p venvs
-    test -d venvs/build-py3.8/ || uv venv -p 3.8 venvs/build-py3.8/
-    test -d venvs/build-py3.9/ || uv venv -p 3.9 venvs/build-py3.9/
     test -d venvs/build-py3.10/ || uv venv -p 3.10 venvs/build-py3.10/
     test -d venvs/build-py3.11/ || uv venv -p 3.11 venvs/build-py3.11/
     test -d venvs/build-py3.12/ || uv venv -p 3.12 venvs/build-py3.12/
@@ -124,20 +122,16 @@ venv-sync venv:
     VIRTUAL_ENV={{justfile_directory()}}/venvs/{{venv}} uv pip sync --strict requirements/{{venv}}.txt
 
 # Sync all venvs
-venv-sync-all: (venv-sync "doc") (venv-sync "build-py3.8") (venv-sync "build-py3.9") (venv-sync "build-py3.10") (venv-sync "build-py3.11") (venv-sync "build-py3.12") (venv-sync "dev")
+venv-sync-all: (venv-sync "doc") (venv-sync "build-py3.10") (venv-sync "build-py3.11") (venv-sync "build-py3.12") (venv-sync "dev")
 
 # Pin / compile all dependences for reproducible venvs; re-run this if you update any library deps or `.in` files
 venv-compile-all:
     uv pip compile --generate-hashes -p 3.12 requirements/doc.in -o requirements/doc.txt
 
-    uv pip compile --generate-hashes -p 3.8 --all-extras pyproject.toml -o requirements/lib-py3.8.txt
-    uv pip compile --generate-hashes -p 3.9 --all-extras pyproject.toml -o requirements/lib-py3.9.txt
     uv pip compile --generate-hashes -p 3.10 --all-extras pyproject.toml -o requirements/lib-py3.10.txt
     uv pip compile --generate-hashes -p 3.11 --all-extras pyproject.toml -o requirements/lib-py3.11.txt
     uv pip compile --generate-hashes -p 3.12 --all-extras pyproject.toml -o requirements/lib-py3.12.txt
 
-    uv pip compile --generate-hashes -p 3.8 requirements/build.in requirements/lib-py3.8.txt -o requirements/build-py3.8.txt
-    uv pip compile --generate-hashes -p 3.9 requirements/build.in requirements/lib-py3.9.txt -o requirements/build-py3.9.txt
     uv pip compile --generate-hashes -p 3.10 requirements/build.in requirements/lib-py3.10.txt -o requirements/build-py3.10.txt
     uv pip compile --generate-hashes -p 3.11 requirements/build.in requirements/lib-py3.11.txt -o requirements/build-py3.11.txt
     uv pip compile --generate-hashes -p 3.12 requirements/build.in requirements/lib-py3.12.txt -o requirements/build-py3.12.txt

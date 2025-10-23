@@ -9,6 +9,11 @@ For help with updating to new Bytewax versions, please see the
 __Add any extra change notes here and we'll put them in the release
 notes on GitHub when we make a new release.__
 
+## v0.22.0
+- Fixes a stall when multiple workers read from partitioned input
+  https://github.com/nrdhm/bytewax/pull/3
+
+
 ## v0.21.1
 
 - `join_window` operator now supports using stream-order via the

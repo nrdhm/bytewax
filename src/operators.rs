@@ -15,12 +15,10 @@ use timely::dataflow::channels::pact::Pipeline;
 use timely::dataflow::operators::generic::builder_rc::OperatorBuilder;
 use timely::dataflow::operators::Concatenate;
 use timely::dataflow::operators::Exchange;
-use timely::dataflow::operators::Map;
 use timely::dataflow::operators::ToStream;
 use timely::dataflow::Scope;
 use timely::dataflow::Stream;
 use timely::order::TotalOrder;
-use timely::progress::Antichain;
 use timely::ExchangeData;
 
 use crate::errors::PythonException;
@@ -58,19 +56,17 @@ where
         let (mut falses_output, falses) = op_builder.new_output();
 
         op_builder.build(move |_| {
-            let mut inbuf = Vec::new();
             move |_frontiers| {
                 let mut trues_handle = trues_output.activate();
                 let mut falses_handle = falses_output.activate();
 
                 Python::with_gil(|py| {
                     self_handle.for_each(|time, data| {
-                        data.swap(&mut inbuf);
                         let mut trues_session = trues_handle.session(&time);
                         let mut falses_session = falses_handle.session(&time);
                         let pred = predicate.bind(py);
                         unwrap_any!(|| -> PyResult<()> {
-                            for item in inbuf.drain(..) {
+                            for item in data.drain(..) {
                                 let res = pred
                                     .call1((item.bind(py),))
                                     .reraise_with(|| {
@@ -105,7 +101,7 @@ fn next_batch(
     in_batch: Vec<PyObject>,
 ) -> PyResult<()> {
     let res = mapper.call1((in_batch,)).reraise("error calling mapper")?;
-    let iter = res.iter().reraise_with(|| {
+    let iter = res.try_iter().reraise_with(|| {
         format!(
             "mapper must return an iterable; got a `{}` instead",
             unwrap_any!(res.get_type().name()),
@@ -197,7 +193,7 @@ where
 
                                 unwrap_any!(Python::with_gil(|py| -> PyResult<()> {
                                     let batch: Vec<_> =
-                                        batch.into_iter().map(PyObject::from).collect();
+                                        batch.into_iter().map(|x| x.into_py(py)).collect();
                                     let mapper = mapper.bind(py);
 
                                     with_timer!(
@@ -211,7 +207,7 @@ where
                                     );
 
                                     item_out_count.add(outbuf.len() as u64, &labels);
-                                    downstream_session.give_vec(&mut outbuf);
+                                    downstream_session.give_container(&mut outbuf);
 
                                     Ok(())
                                 }));
@@ -242,7 +238,7 @@ where
 impl<S> InspectDebugOp<S> for Stream<S, TdPyAny>
 where
     S: Scope,
-    S::Timestamp: IntoPy<PyObject> + TotalOrder,
+    for<'py> S::Timestamp: IntoPyObject<'py> + TotalOrder,
 {
     fn inspect_debug(
         &self,
@@ -302,7 +298,7 @@ where
                                     Ok(())
                                 }));
 
-                                downstream_session.give_vec(&mut items);
+                                downstream_session.give_container(&mut items);
                                 clock_session.give(());
                             }
                         },
@@ -379,38 +375,36 @@ where
         let (mut downstream_output, downstream) = op_builder.new_output();
 
         op_builder.build(move |_| {
-            let mut inbuf = Vec::new();
             move |_frontiers| {
                 let mut downstream_handle = downstream_output.activate();
 
-                Python::with_gil(|py| {
-                    self_handle.for_each(|time, data| {
-                        data.swap(&mut inbuf);
-                        let mut downstream_session = downstream_handle.session(&time);
-                        unwrap_any!(|| -> PyResult<()> {
-                            for item in inbuf.drain(..) {
-                                let item = PyObject::from(item);
-                                let (key, value) = item
-                                    .extract::<(&PyAny, PyObject)>(py)
-                                    .raise_with::<PyTypeError>(|| {
-                                        format!("step {for_step_id} requires `(key, value)` 2-tuple from upstream for routing; got a `{}` instead",
+                self_handle.for_each(|time, data| {
+                    let mut downstream_session = downstream_handle.session(&time);
+                    unwrap_any!(Python::with_gil(|py| -> PyResult<()> {
+                        for item in data.drain(..) {
+                            let item = item.into_py(py);
+                            let (key, value) = item
+                                .extract::<(Bound<'_, PyAny>, PyObject)>(py)
+                                .raise_with::<PyTypeError>(|| {
+                                    format!("step {for_step_id} requires `(key, value)` 2-tuple from upstream for routing; got a `{}` instead",
                                             unwrap_any!(item.bind(py).get_type().name()),
-                                        )
-                                    })?;
-
-                                let key = key.extract::<StateKey>().raise_with::<PyTypeError>(|| {
-                                    format!("step {for_step_id} requires `str` keys in `(key, value)` from upstream; got a `{}` instead",
-                                        unwrap_any!(key.get_type().name()),
                                     )
                                 })?;
-                                downstream_session.give((key, TdPyAny::from(value)));
-                            }
-                            Ok(())
-                        }());
-                    });
+
+                            let key = key.extract::<StateKey>().raise_with::<PyTypeError>(|| {
+                                format!("step {for_step_id} requires `str` keys in `(key, value)` from upstream; got a `{}` instead",
+                                        unwrap_any!(key.get_type().name()),
+                                )
+                            })?;
+                            downstream_session.give((key, TdPyAny::from(value)));
+                        }
+
+                        Ok(())
+                    }));
                 });
             }
         });
+
         downstream
     }
 }
@@ -419,21 +413,41 @@ pub(crate) trait WrapKeyOp<S>
 where
     S: Scope,
 {
-    fn wrap_key(&self) -> Stream<S, TdPyAny>;
+    fn wrap_key(&self, for_step_id: StepId) -> Stream<S, TdPyAny>;
 }
 
 impl<S> WrapKeyOp<S> for Stream<S, (StateKey, TdPyAny)>
 where
     S: Scope,
 {
-    fn wrap_key(&self) -> Stream<S, TdPyAny> {
-        self.map(move |(key, value)| {
-            let value = PyObject::from(value);
+    fn wrap_key(&self, for_step_id: StepId) -> Stream<S, TdPyAny> {
+        let mut op_builder = OperatorBuilder::new(format!("{for_step_id}.wrap_key"), self.scope());
+        let mut self_handle = op_builder.new_input(self, Pipeline);
 
-            let item = Python::with_gil(|py| IntoPy::<PyObject>::into_py((key, value), py));
+        let (mut downstream_output, downstream) = op_builder.new_output();
 
-            TdPyAny::from(item)
-        })
+        op_builder.build(move |_| {
+            move |_frontiers| {
+                let mut downstream_handle = downstream_output.activate();
+
+                self_handle.for_each(|time, data| {
+                    let mut downstream_session = downstream_handle.session(&time);
+                    unwrap_any!(Python::with_gil(|py| -> PyResult<()> {
+                        for (key, value) in data.drain(..) {
+                            let value = value.into_py(py);
+
+                            let item = (key, value).into_pyobject(py)?;
+
+                            downstream_session.give(TdPyAny::from(item));
+                        }
+
+                        Ok(())
+                    }));
+                });
+            }
+        });
+
+        downstream
     }
 }
 
@@ -458,14 +472,14 @@ impl<'py> FromPyObject<'py> for StatefulBatchLogic {
     fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
         let py = ob.py();
         let abc = py
-            .import_bound("bytewax.operators")?
+            .import("bytewax.operators")?
             .getattr("StatefulBatchLogic")?;
         if !ob.is_instance(&abc)? {
             Err(PyTypeError::new_err(
                 "logic must subclass `bytewax.operators.StatefulBatchLogic`",
             ))
         } else {
-            Ok(Self(ob.to_object(py)))
+            Ok(Self(ob.as_unbound().clone_ref(py)))
         }
     }
 }
@@ -492,12 +506,14 @@ impl<'py> FromPyObject<'py> for IsComplete {
 
 impl StatefulBatchLogic {
     fn extract_ret(res: Bound<'_, PyAny>) -> PyResult<(Vec<PyObject>, IsComplete)> {
-        let (iter, is_complete) = res.extract::<(&PyAny, &PyAny)>().reraise_with(|| {
-            format!(
-                "did not return a 2-tuple of `(emit, is_complete)`; got a `{}` instead",
-                unwrap_any!(res.get_type().name())
-            )
-        })?;
+        let (iter, is_complete) = res
+            .extract::<(Bound<'_, PyAny>, Bound<'_, PyAny>)>()
+            .reraise_with(|| {
+                format!(
+                    "did not return a 2-tuple of `(emit, is_complete)`; got a `{}` instead",
+                    unwrap_any!(res.get_type().name())
+                )
+            })?;
         let is_complete = is_complete.extract::<IsComplete>()?;
         let emit = iter.extract::<Vec<_>>().reraise_with(|| {
             format!(
@@ -579,19 +595,13 @@ where
         let (mut kv_downstream_output, kv_downstream) = op_builder.new_output();
         let (mut snaps_output, snaps) = op_builder.new_output();
 
-        let mut input_handle = op_builder.new_input_connection(
-            &partd_self,
-            routed_exchange(),
-            vec![Antichain::from_elem(0), Antichain::from_elem(0)],
-        );
-        let mut loads_handle = op_builder.new_input_connection(
-            &partd_loads,
-            routed_exchange(),
-            vec![Antichain::from_elem(0), Antichain::from_elem(0)],
-        );
+        let mut input_handle = op_builder.new_input(&partd_self, routed_exchange());
 
+        let mut loads_handle = op_builder.new_input(&partd_loads, routed_exchange());
+
+        let o_step_id = step_id.clone();
         let info = op_builder.operator_info();
-        let activator = self.scope().activator_for(&info.address[..]);
+        let activator = self.scope().activator_for(info.address);
 
         let meter = opentelemetry::global::meter("bytewax");
         let item_inp_count = meter
@@ -755,13 +765,13 @@ where
                             if let Some(items) = inbuf.remove(&epoch) {
                                 item_inp_count.add(items.len() as u64, &labels);
 
-                                let mut keyed_items: BTreeMap<StateKey, Vec<PyObject>> = BTreeMap::new();
-                                for (worker, (key, value)) in items {
-                                    assert!(worker == this_worker);
-                                    keyed_items.entry(key).or_default().push(PyObject::from(value));
-                                }
-
                                 unwrap_any!(Python::with_gil(|py| -> PyResult<()> {
+                                    let mut keyed_items: BTreeMap<StateKey, Vec<PyObject>> = BTreeMap::new();
+                                    for (worker, (key, value)) in items {
+                                        assert!(worker == this_worker);
+                                        keyed_items.entry(key).or_default().push(value.into_py(py));
+                                    }
+
                                     let builder = builder.bind(py);
 
                                     for (key, values) in keyed_items {
@@ -784,7 +794,7 @@ where
                                             logic
                                                 .on_batch(py, values)
                                                 .reraise_with(|| format!(
-                                                    "error calling `StatefulBatchLogic.on_batch` in step {step_id} for key {key}"
+                                                    "error calling `StatefulBatchLogic.on_batch` in step {o_step_id} for key {key}"
                                                 ))?
                                         );
 
@@ -826,7 +836,7 @@ where
                                             on_notify_histogram,
                                             labels,
                                             logic.on_notify(py).reraise_with(|| format!(
-                                                "error calling `StatefulBatchLogic.on_notify` in {step_id} for key {key}"
+                                                "error calling `StatefulBatchLogic.on_notify` in {o_step_id} for key {key}"
                                             ))?
                                         );
 
@@ -868,7 +878,7 @@ where
                                             on_eof_histogram,
                                             labels,
                                             logic.on_eof(py).reraise_with(|| format!(
-                                                "error calling `StatefulBatchLogic.on_eof` in {step_id} for key {key}"
+                                                "error calling `StatefulBatchLogic.on_eof` in {o_step_id} for key {key}"
                                             ))?
                                         );
 
@@ -910,7 +920,7 @@ where
                                                 notify_at_histogram,
                                                 labels,
                                                 logic.notify_at(py).reraise_with(|| {
-                                                    format!("error calling `StatefulBatchLogic.notify_at` in {step_id} for key {key}")
+                                                    format!("error calling `StatefulBatchLogic.notify_at` in {o_step_id} for key {key}")
                                                 })?
                                             );
                                             if let Some(sched) = sched {
@@ -949,7 +959,7 @@ where
                                                 snapshot_histogram,
                                                 labels,
                                                 logic.snapshot(py).reraise_with(|| {
-                                                    format!("error calling `StatefulBatchLogic.snapshot` in {step_id} for key {key}")
+                                                    format!("error calling `StatefulBatchLogic.snapshot` in {o_step_id} for key {key}")
                                                 })?
                                             );
                                             StateChange::Upsert(TdPyAny::from(state))
@@ -963,7 +973,7 @@ where
                                             // `IsComplete::Discard`.
                                             StateChange::Discard
                                         };
-                                        let snap = Snapshot(step_id.clone(), key, change);
+                                        let snap = Snapshot(o_step_id.clone(), key, change);
                                         snaps_session.give(snap);
                                     }
 
@@ -981,7 +991,7 @@ where
                                             assert!(worker == this_worker);
                                             match change {
                                                 StateChange::Upsert(state) => {
-                                                    let state: PyObject = state.into();
+                                                    let state = state.into_py(py);
 
                                                     let logic = builder
                                                         .call1((Some(state),))?
@@ -1031,7 +1041,7 @@ where
             }
         });
 
-        let downstream = kv_downstream.wrap_key();
+        let downstream = kv_downstream.wrap_key(step_id);
 
         Ok((downstream, snaps))
     }

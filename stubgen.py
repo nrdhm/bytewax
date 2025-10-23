@@ -14,6 +14,7 @@ https://mypy.readthedocs.io/en/stable/stubgen.html
 
 import ast
 import dataclasses
+import graphlib
 import importlib
 import inspect
 import itertools
@@ -32,7 +33,6 @@ from types import (
 )
 from typing import List, Mapping, Optional, Tuple, Union
 
-import graphlib
 from typing_extensions import Self, TypeVar
 
 _N = TypeVar("_N")

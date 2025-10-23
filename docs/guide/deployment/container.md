@@ -168,7 +168,7 @@ We showed how to build a custom image to run a Bytewax dataflow, but
 Bytewax also offers some premade images, that are optimizied for build
 size and have customizations options so that you don't always have to
 create your own image from scratch. Releases are available in Docker
-Hub with these python versions: 3.8, 3.9, 3.10 and 3.11.
+Hub with these python versions: 3.10, 3.11 and 3.12.
 
 We implement the following naming convention:
 
@@ -182,19 +182,17 @@ images:
 ```{code-block}
 :substitutions:
 
-bytewax/bytewax:|version|-python3.8
-bytewax/bytewax:|version|-python3.9
 bytewax/bytewax:|version|-python3.10
 bytewax/bytewax:|version|-python3.11
+bytewax/bytewax:|version|-python3.12
 ```
 
 And for the latest version of Bytewax:
 
 ```
-bytewax/bytewax:latest-python3.8
-bytewax/bytewax:latest-python3.9
 bytewax/bytewax:latest-python3.10
 bytewax/bytewax:latest-python3.11
+bytewax/bytewax:latest-python3.12
 ```
 
 The standard `latest` tag is equivalent to `latest-python3.9`.

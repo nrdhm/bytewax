@@ -104,33 +104,21 @@ create_exception!(
 );
 
 /// Represents a `bytewax.inputs.Source` from Python.
-#[derive(Clone)]
+#[derive(IntoPyObject)]
 pub(crate) struct Source(Py<PyAny>);
 
 /// Do some eager type checking.
 impl<'py> FromPyObject<'py> for Source {
     fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
         let py = ob.py();
-        let abc = py.import_bound("bytewax.inputs")?.getattr("Source")?;
+        let abc = py.import("bytewax.inputs")?.getattr("Source")?;
         if !ob.is_instance(&abc)? {
             Err(PyTypeError::new_err(
                 "source must subclass `bytewax.inputs.Source`",
             ))
         } else {
-            Ok(Self(ob.to_object(py)))
+            Ok(Self(ob.as_unbound().clone_ref(py)))
         }
-    }
-}
-
-impl IntoPy<Py<PyAny>> for Source {
-    fn into_py(self, _py: Python<'_>) -> Py<PyAny> {
-        self.0
-    }
-}
-
-impl ToPyObject for Source {
-    fn to_object(&self, py: Python<'_>) -> PyObject {
-        self.0.to_object(py)
     }
 }
 
@@ -144,7 +132,6 @@ impl Source {
 }
 
 /// Represents a `bytewax.inputs.FixedPartitionedSource` from Python.
-#[derive(Clone)]
 pub(crate) struct FixedPartitionedSource(Py<PyAny>);
 
 /// Do some eager type checking.
@@ -152,14 +139,14 @@ impl<'py> FromPyObject<'py> for FixedPartitionedSource {
     fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
         let py = ob.py();
         let abc = py
-            .import_bound("bytewax.inputs")?
+            .import("bytewax.inputs")?
             .getattr("FixedPartitionedSource")?;
         if !ob.is_instance(&abc)? {
             Err(PyTypeError::new_err(
                 "fixed partitioned source must subclass `bytewax.inputs.FixedPartitionedSource`",
             ))
         } else {
-            Ok(Self(ob.to_object(py)))
+            Ok(Self(ob.as_unbound().clone_ref(py)))
         }
     }
 }
@@ -269,7 +256,7 @@ impl FixedPartitionedSource {
         let (mut snaps_output, snaps) = op_builder.new_output();
 
         let info = op_builder.operator_info();
-        let activator = scope.activator_for(&info.address[..]);
+        let activator = scope.activator_for(info.address);
         let probe = probe.clone();
         let abort = abort.clone();
 
@@ -304,7 +291,7 @@ impl FixedPartitionedSource {
             let mut parts: BTreeMap<StateKey, PartitionedPartState> = BTreeMap::new();
             let mut primary_parts = BTreeSet::new();
 
-            let mut tmp = Vec::new();
+            // let mut tmp = Vec::new();
             let mut primaries_inbuf = InBuffer::new();
 
             move |input_frontiers| {
@@ -318,9 +305,6 @@ impl FixedPartitionedSource {
 
                     loads_input.for_each(|cap, incoming| {
                         let load_epoch = cap.time();
-                        assert!(tmp.is_empty());
-                        incoming.swap(&mut tmp);
-
                         // Snapshots might be from an "old" epoch if
                         // there were no items and thus snapshots
                         // stored during a more recent epoch, so
@@ -329,7 +313,7 @@ impl FixedPartitionedSource {
                         let emit_epoch = std::cmp::max(*load_epoch, start_at.0);
 
                         unwrap_any!(Python::with_gil(|py| -> PyResult<()> {
-                            for (worker, (part_key, change)) in tmp.drain(..) {
+                            for (worker, (part_key, change)) in incoming.drain(..) {
                                 assert!(worker == this_worker);
 
                                 if let StateChange::Upsert(state) = change {
@@ -338,7 +322,7 @@ impl FixedPartitionedSource {
                                         py,
                                         &step_id,
                                         &part_key,
-                                        Some(state.into())
+                                        Some(state.into_py(py))
                                     ).reraise_with(|| format!("error calling `FixedPartitionSource.build_part` in step {step_id} for partition {part_key}"))?;
                                     let next_awake = part.next_awake(py)
                                         .reraise_with(|| format!("error calling `StatefulSourcePartition.next_awake` in step {step_id} for partition {part_key}"))?;
@@ -430,12 +414,13 @@ impl FixedPartitionedSource {
                             );
                             let epoch = *part_state.downstream_cap.time();
 
+                            let is_ahead = probe.less_than(&epoch);
                             // When we increment the epoch for this
                             // partition, wait until all ouputs have
                             // finished the previous epoch before
                             // emitting more data to have
                             // backpressure.
-                            if !probe.less_than(&epoch) {
+                            if !is_ahead {
                                 let mut eof = false;
                                 // Separately check wheither we should
                                 // call `next_batch` because we need
@@ -461,7 +446,7 @@ impl FixedPartitionedSource {
                                                 let mut downstream_session = downstream_handle.session(&part_state.downstream_cap);
                                                 item_out_count.add(batch_len as u64, &labels);
                                                 let mut batch = batch.into_iter().map(TdPyAny::from).collect();
-                                                downstream_session.give_vec(&mut batch);
+                                                downstream_session.give_container(&mut batch);
 
                                                 let next_awake_res = part_state
                                                     .part
@@ -498,6 +483,10 @@ impl FixedPartitionedSource {
                                 // this if-block) otherwise you can
                                 // get cascading advancement and never
                                 // poll input.
+                                //
+                                // Well, it turns out, we do not catch up for just one spin.
+                                // We have to ignore all this time in waiting.
+                                //
                                 if now - part_state.epoch_started >= epoch_interval.0 || eof {
                                     unwrap_any!(Python::with_gil(|py| -> PyResult<()> {
                                         let state = with_timer!(
@@ -526,6 +515,35 @@ impl FixedPartitionedSource {
                                         Ok(())
                                     }));
                                 }
+                            } else {
+                                tracing::debug!("partition is ahead of others and must wait");
+                                // TODO could use a notificator here?
+                                // Need to wait for the next epoch of the probe somehow.
+                                // Without this extra time, we would spin up again and waste cycles.
+                                // let delta = TimeDelta::try_milliseconds(100).unwrap();
+                                // part_state.next_awake = default_next_awake(Some(now + delta), 0, now);
+                                // A dirty hack?
+                                // Trying to resolve an issue when one partition
+                                // increasingly lags behind of another in multiworker setup.
+                                //
+                                // The bug appears when a pair of kafka consumers
+                                // read from uneven number of partitions.
+                                //
+                                // So, the first worker gets one extra parition
+                                // and always has work to do.
+                                //
+                                // And the second worker, given some time, starts to spend
+                                // most of its time waiting for another.
+                                //
+                                // The problem is, this waiting time counts towards its snapshot.
+                                // So, when the first worker finally makes its own snapshot
+                                // and the output epoch increases, the second worker gets
+                                // to run only one `next_batch`, after which it is time
+                                // to make a snapshot and wait again.
+                                //
+                                // This way, we do not count time towards snapshot while waiting for another partition.
+                                // And the partition can read all it can after the snapshot of its late neighbor.
+                                part_state.epoch_started = now;
                             }
                         });
                     }
@@ -564,14 +582,14 @@ impl<'py> FromPyObject<'py> for StatefulPartition {
     fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
         let py = ob.py();
         let abc = py
-            .import_bound("bytewax.inputs")?
+            .import("bytewax.inputs")?
             .getattr("StatefulSourcePartition")?;
         if !ob.is_instance(&abc)? {
             Err(tracked_err::<PyTypeError>(
                 "stateful source partition must subclass `bytewax.inputs.StatefulSourcePartition`",
             ))
         } else {
-            Ok(Self(ob.to_object(py)))
+            Ok(Self(ob.as_unbound().clone_ref(py)))
         }
     }
 }
@@ -589,7 +607,7 @@ impl StatefulPartition {
             Err(err) if err.is_instance_of::<AbortExecution>(py) => Ok(BatchResult::Abort),
             Err(err) => Err(err),
             Ok(obj) => {
-                let iter = obj.iter().reraise_with(|| {
+                let iter = obj.try_iter().reraise_with(|| {
                     format!(
                         "`next_batch` must return an iterable; got a `{}` instead",
                         unwrap_any!(obj.get_type().name()),
@@ -629,22 +647,19 @@ impl Drop for StatefulPartition {
 }
 
 /// Represents a `bytewax.inputs.DynamicInput` from Python.
-#[derive(Clone)]
 pub(crate) struct DynamicSource(Py<PyAny>);
 
 /// Do some eager type checking.
 impl<'py> FromPyObject<'py> for DynamicSource {
     fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
         let py = ob.py();
-        let abc = py
-            .import_bound("bytewax.inputs")?
-            .getattr("DynamicSource")?;
+        let abc = py.import("bytewax.inputs")?.getattr("DynamicSource")?;
         if !ob.is_instance(&abc)? {
             Err(tracked_err::<PyTypeError>(
                 "dynamic source must subclass `bytewax.inputs.DynamicSource`",
             ))
         } else {
-            Ok(Self(ob.to_object(py)))
+            Ok(Self(ob.as_unbound().clone_ref(py)))
         }
     }
 }
@@ -708,7 +723,7 @@ impl DynamicSource {
         let (mut downstream_wrapper, downstream) = op_builder.new_output();
 
         let info = op_builder.operator_info();
-        let activator = scope.activator_for(&info.address[..]);
+        let activator = scope.activator_for(info.address);
         let probe = probe.clone();
         let abort = abort.clone();
 
@@ -781,7 +796,7 @@ impl DynamicSource {
                                             let mut downstream_session = downstream_handle.session(&part_state.output_cap);
                                             item_out_count.add(batch_len as u64, &labels);
                                             let mut batch = batch.into_iter().map(TdPyAny::from).collect();
-                                            downstream_session.give_vec(&mut batch);
+                                            downstream_session.give_container(&mut batch);
 
                                             let next_awake_res = part_state
                                                 .part
@@ -849,14 +864,14 @@ impl<'py> FromPyObject<'py> for StatelessPartition {
     fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
         let py = ob.py();
         let abc = py
-            .import_bound("bytewax.inputs")?
+            .import("bytewax.inputs")?
             .getattr("StatelessSourcePartition")?;
         if !ob.is_instance(&abc)? {
             Err(tracked_err::<PyTypeError>(
                 "stateless source partition must subclass `bytewax.inputs.StatelessSourcePartition`",
             ))
         } else {
-            Ok(Self(ob.to_object(py)))
+            Ok(Self(ob.as_unbound().clone_ref(py)))
         }
     }
 }
@@ -868,7 +883,7 @@ impl StatelessPartition {
             Err(err) if err.is_instance_of::<AbortExecution>(py) => Ok(BatchResult::Abort),
             Err(err) => Err(err),
             Ok(obj) => {
-                let iter = obj.iter().reraise_with(|| {
+                let iter = obj.try_iter().reraise_with(|| {
                     format!(
                         "`next_batch` must return an iterable; got a `{}` instead",
                         unwrap_any!(obj.get_type().name()),
@@ -904,6 +919,6 @@ impl Drop for StatelessPartition {
 }
 
 pub(crate) fn register(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add("AbortExecution", py.get_type_bound::<AbortExecution>())?;
+    m.add("AbortExecution", py.get_type::<AbortExecution>())?;
     Ok(())
 }

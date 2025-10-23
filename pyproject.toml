@@ -1,6 +1,6 @@
 [project]
-name = "bytewax"
-requires-python = ">=3.8"
+name = "bytewax-fork"
+requires-python = ">=3.10"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -9,14 +9,14 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: System :: Networking",
     "Topic :: System :: Distributed Computing",
 ]
+dynamic = ["version"]
+
 dependencies = [
     "typing_extensions>=4",
     "prometheus-client>=0.18"
@@ -34,10 +34,10 @@ kafka = [
 ]
 
 [project.urls]
-"Source Code" = "https://github.com/bytewax/bytewax"
-Issues = "https://github.com/bytewax/bytewax/issues"
+"Source Code" = "https://github.com/nrdhm/bytewax"
+Issues = "https://github.com/nrdhm/bytewax/issues"
 Documentation = "https://docs.bytewax.io/"
-Changelog = "https://github.com/bytewax/bytewax/blob/main/CHANGELOG.md"
+Changelog = "https://github.com/nrdhm/bytewax/blob/main/CHANGELOG.md"
 
 [metadata]
 long_description = "file: README.md"
@@ -88,6 +88,7 @@ ignore = [
     "D105",
     "E731",
     "PLR",
+    "B905",  # we know how zip() works
 ]
 
 [tool.ruff.lint.pydocstyle]

@@ -3,11 +3,12 @@ name: benchmarks
 on:
   push:
     branches:
-      - "main"
-  pull_request:
-  # `workflow_dispatch` allows CodSpeed to trigger backtest
-  # performance analysis in order to generate initial data.
-  workflow_dispatch:
+      - "main-x"
+  #     - "main"
+  # pull_request:
+  # # `workflow_dispatch` allows CodSpeed to trigger backtest
+  # # performance analysis in order to generate initial data.
+  # workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number }}
