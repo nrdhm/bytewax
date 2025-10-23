@@ -76,7 +76,7 @@ jobs:
           name: wheels-linux-${{ matrix.target }}-${{ matrix.python-version }}
           path: dist
 
-  windows:
+  windows-build:
     strategy:
       matrix:
         # python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
@@ -133,7 +133,7 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-22.04
-    needs: [ linux-build ]
+    needs: [ linux-build, windows-build ]
     outputs:
       bytewax-version: ${{ steps.get-info.outputs.bytewax-version }}
     environment:
