@@ -17,12 +17,10 @@ jobs:
     name: Build for Linux
     strategy:
       matrix:
-        # target: ['x86_64', 'aarch64', 'armv7']
-        # python-version: ['3.10', '3.11', '3.12']
-        python-version: ['3.12']
-        target: ['x86_64']
-    # runs-on: ubuntu-latest
-    runs-on: ubuntu-22.04
+        target: ['x86_64', 'aarch64', 'armv7']
+        python-version: ['3.10', '3.11', '3.12']
+    runs-on: ubuntu-latest
+    # runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/cache@v4
@@ -76,10 +74,63 @@ jobs:
           name: wheels-linux-${{ matrix.target }}-${{ matrix.python-version }}
           path: dist
 
+  windows-build:
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+    runs-on: windows-latest
+    steps:
+      - uses: ilammy/msvc-dev-cmd@v1
+      - shell: cmd
+        run: |
+          set PATH=%PATH%;%wix%bin;"%WindowsSdkVerBinPath%"\x86
+      - uses: actions/checkout@v3
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Set up uv
+        run: curl -LsSf https://astral.sh/uv/0.3.5/install.sh | sh
+      - uses: extractions/setup-just@v2
+      - name: Prep build venv
+        run: |
+          uv venv -p ${{ matrix.python-version }} venv/
+          venv/Scripts/activate
+          uv pip sync --strict requirements/build-py${{ matrix.python-version }}.txt
+      - name: Build wheel
+        uses: PyO3/maturin-action@v1
+        env:
+          RUSTFLAGS: -C force-frame-pointers=yes
+        with:
+          target: ${{ matrix.target }}
+          args: --release --out dist/ -i ${{ matrix.python-version }}
+          sccache: true
+      - name: Run Python tests
+        run: |
+          venv/Scripts/activate
+          $WHEEL_FILE=@((gci -path dist *.whl|Resolve-path -relative) -replace "","")[0]
+          uv pip install -v --no-deps $WHEEL_FILE
+          just test-py
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-windows-${{ matrix.target }}-${{ matrix.python-version }}
+          path: dist
+
+
   release:
     name: Release
-    runs-on: ubuntu-22.04
-    needs: [ linux-build ]
+    runs-on: ubuntu-latest
+    needs: [ linux-build, windows-build ]
     outputs:
       bytewax-version: ${{ steps.get-info.outputs.bytewax-version }}
     environment:
