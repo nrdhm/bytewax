@@ -103,6 +103,14 @@ class BranchOut(Generic[X, Y]):
 @overload
 def branch(
     step_id: str,
+    up: Stream[X | Y],
+    predicate: Callable[[X | Y], TypeGuard[Y]],
+) -> BranchOut[Y, X]: ...
+
+
+@overload
+def branch(
+    step_id: str,
     up: Stream[X],
     predicate: Callable[[X], TypeGuard[Y]],
 ) -> BranchOut[Y, X]: ...
