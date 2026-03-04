@@ -22,21 +22,17 @@ from typing import (
     List,
     Literal,
     Optional,
+    overload,
     Tuple,
     TypeVar,
     Union,
-    overload,
 )
 
-from bytewax.dataflow import (
-    Dataflow,
-    Stream,
-    f_repr,
-    operator,
-)
+from typing_extensions import override, Self, TypeAlias, TypeGuard
+
+from bytewax.dataflow import Dataflow, f_repr, operator, Stream
 from bytewax.inputs import Source
 from bytewax.outputs import DynamicSink, Sink, StatelessSinkPartition
-from typing_extensions import Self, TypeAlias, TypeGuard, override
 
 X = TypeVar("X")
 """Type of upstream items."""
@@ -100,28 +96,8 @@ class BranchOut(Generic[X, Y]):
     falses: Stream[Y]
 
 
-@dataclass(frozen=True)
-class KeyedBranchOut(Generic[X, Y]):
-    """Streams returned from the {py:obj}`branch` operator."""
-
-    trues: KeyedStream[X]
-    falses: KeyedStream[Y]
-
-
-@overload
-def branch(
-    step_id: str,
-    up: KeyedStream[X | Y],
-    predicate: Callable[[Tuple[str, X | Y]], TypeGuard[Tuple[str, Y]]],
-) -> KeyedBranchOut[Y, X]: ...
-
-
-@overload
-def branch(
-    step_id: str,
-    up: Stream[X | Y],
-    predicate: Callable[[X | Y], TypeGuard[Y]],
-) -> BranchOut[Y, X]: ...
+# Can't use Stream[X | Y] here cause type checker (pyright) acts funny:
+#                           subtypes of the union sometimes swap places.
 
 
 @overload
