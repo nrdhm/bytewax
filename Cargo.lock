@@ -206,7 +206,7 @@ checksum = "1e748733b7cbc798e1434b6ac524f0c1ff2ab456fe201501e6497c8417a4fc33"
 
 [[package]]
 name = "bytewax"
-version = "0.22.0-rc.8"
+version = "0.22.0-rc.9"
 dependencies = [
  "axum 0.5.17",
  "chrono",
