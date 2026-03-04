@@ -100,6 +100,22 @@ class BranchOut(Generic[X, Y]):
     falses: Stream[Y]
 
 
+@dataclass(frozen=True)
+class KeyedBranchOut(Generic[X, Y]):
+    """Streams returned from the {py:obj}`branch` operator."""
+
+    trues: KeyedStream[X]
+    falses: KeyedStream[Y]
+
+
+@overload
+def branch(
+    step_id: str,
+    up: KeyedStream[X | Y],
+    predicate: Callable[[Tuple[str, X | Y]], TypeGuard[Tuple[str, Y]]],
+) -> KeyedBranchOut[Y, X]: ...
+
+
 @overload
 def branch(
     step_id: str,
